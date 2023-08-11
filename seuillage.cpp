@@ -1,4 +1,7 @@
-#include <opencv2/opencv.hpp> 
+#include <opencv2/opencv.hpp>
+#include <macros.h>
+#include <jc.h>
+
 using namespace cv;
 
 #define B 0
@@ -13,6 +16,13 @@ using namespace cv;
 */
 uchar *dataGlobal = NULL;
 uint rowsGlobal=0,colsGlobal = 0;
+uchar *dataGlobalInitial = NULL;
+
+int isRed1(uchar *data,uint ind)
+{
+  return ((data[ind+R] > data[ind+B]) && (data[ind+R] > data[ind+G]));
+}     // FIN int isRed(uchar *data,uint ind)
+// ***************************************************************************************
 
 int isRed(uchar *data,uint ind)
 {
@@ -25,12 +35,13 @@ int isRed(uchar *data,uint ind)
   if (data[ind+B]>140)
     return 0;
   return 1;
-}     // FIN int isRed(uchar *data,uint ind)
+}     // FIN int isRed1(uchar *data,uint ind)
 // ***************************************************************************************
 
 int isBlack(uchar *data,uint ind)
 {
-  return (data[ind+R]<100) && (data[ind+B]<100) && (data[ind+G]<100);
+  uint seuil = 60;
+  return (data[ind+R]<seuil) && (data[ind+B]<seuil) && (data[ind+G]<seuil);
 }     // FIN int isBlack(uchar *data,uint ind)
 // ***************************************************************************************
 
@@ -51,14 +62,24 @@ void createAlphaImage(const Mat& mat, Mat_<Vec4b>& dst)
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
   //printf("%u %u ",x,y);
+  static int first = 1;
+  static FILE *ft;
   uint l = y;
   uint c = x;
   if  ( event == EVENT_LBUTTONDOWN )
     {
       //printf("Left button of the mouse is clicked \n");
+      if (first)
+	{
+	  first = 0;
+	  ft = fopen("traceRed","a");
+	  if (ft==NULL)
+	    exit(0);
+	}
       printf("callBack: x=%u y=%u values= ",x,y);
       uint k = 3*l*colsGlobal + 3*c;
-      printf("R=%u G=%u B=%u\n",dataGlobal[k + R],dataGlobal[k + G],dataGlobal[k + B]);
+      printf("R=%u G=%u B=%u\n",dataGlobalInitial[k + R],dataGlobalInitial[k + G],dataGlobalInitial[k + B]);
+      fprintf(ft,"%u %u %u   %u %u\n",dataGlobalInitial[k + R],dataGlobalInitial[k + G],dataGlobalInitial[k + B],x,y);
     }
   else if  ( event == EVENT_RBUTTONDOWN )
     {
@@ -78,7 +99,10 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 int main(int argc, char** argv) 
 { 
  // Read the image file 
- Mat image = imread("a.jpg"); 
+  std::string fileName = "a.jpg";
+  if (argc==2)
+    fileName = std::string(argv[1]);
+  Mat image = imread(fileName); 
  uint rows = image.rows;
  uint cols = image.cols;
  uchar *data = image.data;
@@ -86,19 +110,33 @@ int main(int argc, char** argv)
  rowsGlobal = rows;
  colsGlobal = cols;
 
+ _ALLOUE(dataGlobalInitial,rows*cols*3,uchar);
+ for(uint i=0;i<rows*cols*3;i++)
+   dataGlobalInitial[i] = data[i];
+ 
  String windowName = "My Window"; //Name of the window
  namedWindow(windowName); // Create a window
  imshow(windowName, image); // Show our image inside the created window.
  setMouseCallback("My Window", CallBackFunc, NULL);
  waitKey(0); // Wait for any keystroke in the window
- printf("modifivation de l'image");
+ printf("modification de l'image");
  
  for (uint i=0;i<3*rows*cols*3;i+=3)
    {
      if (isRed(data,i))
-       continue;
-     // if (isBlack(data,i))
-     //  continue;
+       {
+	 data[i+R] = 255;
+	 data[i+G] = 0;
+	 data[i+B] = 0;
+	 continue;
+       }
+     if (isBlack(data,i))
+       {
+	 data[i+R] = 0;
+	 data[i+G] = 0;
+	 data[i+B] = 0;
+	 continue;
+       }
      data[i+R] = 255;
      data[i+G] = 255;
      data[i+B] = 255;
