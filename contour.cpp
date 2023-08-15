@@ -1,21 +1,56 @@
+#include <string.h>
+#include <strings.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <malloc.h>
+#include <iostream>
+using namespace std;
+#include <jc.h>
+
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include <set>
+#include <unordered_set>
+#include <algorithm>
 
-using namespace cv;
 
+#define _COMMENTS "\n"
+
+void helper(){}
+// **********************************************************************
+//                        VARIABLES GLOBALES
+// **********************************************************************
+
+// **********************************************************************
+//                            MACROS
+// **********************************************************************
+#include "/home/dauriac/include/macros.h"
 #define B 0
 #define G 1
 #define R 2
 /*
   use data[i+B] for the blue canal, data[i+G] for green, and data[i+R] for red
   pour acceder a l'element (l,c) 0<=l<lines; 0<=c<rows
-  data[l*3*cols + 3*c + R] = 255;
+  data[l*3*cols + 3*c + R] = 255
   data[l*3*cols + 3*c + G] = 255;
   data[l*3*cols + 3*c + B] = 255;
 */
+
+// **********************************************************************
+//                            PROTOTYPE DES FUNCTIONS
+// **********************************************************************
+// **********************************************************************
+//                            DEFINITION DES FUNCTIONS
+// **********************************************************************
+using namespace cv;
+using namespace std;
+
 uchar *dataGlobal = NULL;
 uint rowsGlobal=0,colsGlobal = 0;
-std::vector<std::vector<Point>> contoursGlobal;
+vector<vector<Point>> contoursGlobal;
+int intGlobal=-1;
+vector<Point> multiplon(vector<Point> &vecteurOriginal);
 
 int isRed(uchar *data,uint ind)
 {
@@ -51,7 +86,7 @@ int isBlack(uchar *data,uint ind)
 
 void createAlphaImage(const Mat& mat, Mat_<Vec4b>& dst)
 {
-  std::vector<Mat> matChannels;
+  vector<Mat> matChannels;
   split(mat, matChannels);
   
   // create alpha channel
@@ -68,11 +103,21 @@ void trackBarCallBack(int event, void* userdata)
 }     // FIN void trackBarCallBack(int event void* userdata)
 // ***************************************************************************************
 
-int analyseContour(std::vector<Point> &contour)
+int analyseContour(vector<Point> &contour) // 36
 // retourne 1 si mertote d'etre analyser
 {
-  static int cpt = 0;
-  printf("%d longeur= %lu (row=%d,cols=%d) ",cpt++,contour.size(),rowsGlobal,colsGlobal);
+  static int cpt = -1;
+  cpt++;
+  /*
+  if (!(((int)contour.size()>390) && ((int)contour.size()<582)))
+    return 0;
+  */
+  int contSize = contour.size();
+  if (contSize<300)
+    return 0;
+  if (contSize>600)
+    return 0;
+  printf("%d longeur= %lu (row=%d,cols=%d) ",cpt,contour.size(),rowsGlobal,colsGlobal);
   double xa=0,ya=0,xi=rowsGlobal,yi=rowsGlobal;
   for(uint i=0;i<contour.size();i++)
     {
@@ -92,12 +137,14 @@ int analyseContour(std::vector<Point> &contour)
   double xc = (xi+xa)/2.;
   double yc = (yi+ya)/2.;
   printf("%lf<=x<=%lf  %lf<=x<=%lf  lx=%lf ly=%lf xc=%lf yc=%lf\n",xi,xa,yi,ya,lx,ly,xc,yc);
-  return cpt==39;
-  return (xi>colsGlobal/2.) && (xa<colsGlobal/2.);
-  return (xi>rowsGlobal/2.) && (xa<rowsGlobal/2.);
+  if ((xi>colsGlobal/2) || (xa<colsGlobal/2))
+    return 0;
+  // return (contour.size()>200) && (contour.size()<700);
+  // return (xi>colsGlobal/2.) && (xa<colsGlobal/2.);
+  // return (xi>rowsGlobal/2.) && (xa<rowsGlobal/2.);
 
   return 1;
-}     // FIN void analyseContour(std::vector<Point> &contour)
+}     // FIN void analyseContour(vector<Point> &contour)
 // ***************************************************************************************
 
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -127,13 +174,110 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 }     // FINvoid CallBackFunc(int event, int x, int y, int flags, void* userdata)
 // ****************************************************************************************
 
-int main(int argc, char** argv) 
-{ 
-  // Read the image file
-  std::string fileName = "a.jpg";
-  if (argc==2)
-    fileName = std::string(argv[1]);
-  printf("%s\n",fileName.c_str());
+void analyseContours(vector<vector<Point>> &contours)
+{
+  printf("Entering analyseContours\n");
+  for (uint i=0;i<contours.size();i++)
+    {
+      vector<Point> contour = contours[i];
+      uint s = contour.size();
+      // creation fichier gnuplot
+      FILE *ft = NULL;
+      char name[255];
+      sprintf(name,"contour%u_",(uint)s);
+      char nameComplet[256+30];
+      for(uint k=0;k<1000;k++)
+	{
+	  sprintf(nameComplet,"%s%d.gnu",name,k);
+	  ft = fopen(nameComplet,"r");
+	  if (ft==NULL)
+	    {
+	      // n'existe pas, je peux le creer
+	      ft = fopen(nameComplet,"w");
+	      if (ft==NULL)
+		exit(123);
+	      //printf("%s ouvert\n",nameComplet);
+	      break;
+	    }
+	  else
+	    fclose(ft);
+	}
+      if (ft==NULL)
+	exit(124);
+      fprintf(ft,"# contour %d\n",i);
+      for(uint j=0;j<s;j++)
+	fprintf(ft,"%d %d\n",contour[j].x,contour[j].y);
+      fclose(ft);
+       if (s==1413)
+	s=3;
+       vector<Point> mp = multiplon(contour);
+       if (mp.size()!=0)
+	{
+	  printf("%s il a %d point double\n",nameComplet,(int)mp.size());
+	}
+      // y a t il des points doubles
+    }
+  exit(0);
+}     // FIN void analyseContours(vector<vector<Point>> &contours)
+// ****************************************************************************************
+
+vector<Point> multiplon(vector<Point> &vecteurOriginal)
+// retourne le vecteur des multiplons
+{
+  vector<Point> ans;
+  set<int> setOrigCode;
+  for (Point element : vecteurOriginal)
+    {
+      int k = element.x*10000 + element.y;
+      Point pt(k/10000,k%10000);
+      if (setOrigCode.count(k)>=1)
+	ans.push_back(Point(k/10000,k%10000));
+      else
+	setOrigCode.insert(k);
+    }
+  return ans;
+}     // FIN vector<Point> multiplon(vector<Point> &vecteurOriginal)
+// ****************************************************************************************
+
+int main(int na,char *para[]) 
+{
+  int i;
+  
+  int verbose = 0;
+  int n = 12;
+  char fileName[256] = "a.jpg";
+  _INITQ;
+  for (i=1;i<=na;i++)
+    {
+      char *st,noml[8192],ok,j;
+     
+      st = para[i];
+      ok = i==na;
+      if (!ok)
+        cmdline+=string(st)+" ";
+      
+      for (j=0;j<2;j++)
+	{
+	  if (j && !ok) 
+	    {
+	      printf(_COMMENTS);
+	      printf("usage (%s):\n",st);
+	    }
+	  // METTRE ICI LES DIFFERNTES VALEURS DE LA LIGNE DE COMMANDE
+	  _QU(verbose,"%d"," (niveau de blabla)");
+	  _QU(n,"%d"," (valeur de n)");
+	  _QS(fileName,"%s","fichier a traiter");
+	}
+      if (!ok) 
+        {
+          helper();
+          exit(0);
+        }
+    }
+  // _SET_SEED; // decommenter si seed existe : resoud seed=0 et set redoline
+  if (verbose)
+    _IMPRIM_PARAM(stdout);
+  printf("%s\n",fileName);
   Mat image = imread(fileName); 
   uint rows = image.rows;
   uint cols = image.cols;
@@ -154,13 +298,34 @@ int main(int argc, char** argv)
 	
   // apply binary thresholding
   Mat thresh;
-  threshold(img_gray, thresh, 150, 255, ADAPTIVE_THRESH_GAUSSIAN_C);//THRESH_BINARY);
+  threshold(img_gray, thresh, 150,       255, ADAPTIVE_THRESH_GAUSSIAN_C);
+  /*
+    threshold(Mat, Mat, double, double, int)
+    
+	ADAPTIVE_THRESH_GAUSSIAN_C
+	ADAPTIVE_THRESH_MEAN_C
+	THRESH_BINARY
+ 	THRESH_BINARY_INV
+ 	THRESH_MASK
+	THRESH_OTSU
+	THRESH_TOZERO
+	THRESH_TOZERO_INVT
+	THRESH_TRIANGLE
+	THRESH_TRUNC
+	    
+	https://docs.opencv.org/4.x/d7/d1b/group__imgproc__misc.html#gae8a4a146d1ca78c626a53577199e9c57
+  */
+
+  
+    
   //imwrite("image_thres1.jpg", thresh);
 
-  std::vector<Vec4i> hierarchy;
+  vector<Vec4i> hierarchy;
   findContours(thresh, contoursGlobal, hierarchy, RETR_TREE, CHAIN_APPROX_NONE);
-  std::vector<std::vector<Point>> contours(1);
+  analyseContours(contoursGlobal);
+  vector<vector<Point>> contours(1);
   Mat image_copy = image.clone();
+  uint garde=0;
   for(uint i= 0;i<contoursGlobal.size();i++)
     {
       if (contoursGlobal[i].size()<100)
@@ -168,14 +333,15 @@ int main(int argc, char** argv)
       contours[0] = contoursGlobal[i];
       if (analyseContour(contours[0]))
 	{
+	  garde++;
 	  drawContours(image_copy, contours, -1, Scalar((i * 4) % 255,( 255 - 12 * i) % 255, (112 * i) % 255), 2);
 	}
     }
-  // std::vector<std::vector<Point>> contours1 = {contoursGlobal[1]};
-  // std::vector<std::vector<Point>> contours2 = {contoursGlobal[2]};
-  // std::vector<std::vector<Point>> contours3 = {contoursGlobal[3]};
+  // vector<vector<Point>> contours1 = {contoursGlobal[1]};
+  // vector<vector<Point>> contours2 = {contoursGlobal[2]};
+  // vector<vector<Point>> contours3 = {contoursGlobal[3]};
 
-  printf("il y a %lu contours\n",contoursGlobal.size());
+  printf("il y a %lu contours dont %u gardes\n",contoursGlobal.size(),garde);
   
   // draw contours on the original image
   // drawContours(image_copy, contours, -1, Scalar(255, 255, 0), 2);
@@ -185,5 +351,9 @@ int main(int argc, char** argv)
 
   waitKey(0); // Wait for any keystroke in the window
   destroyWindow(windowName); //destroy the created window
-  return 0; 
-}
+
+  if (verbose)
+    _PRINT_TIMENOW(stdout);  
+  return 0;
+}		/* FIN main() */
+// *******************************************************************
