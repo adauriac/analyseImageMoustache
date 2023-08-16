@@ -15,3 +15,9 @@ voirCouleur:voirCouleur.cpp Makefile
 
 test:test.cpp Makefile
 	g++ test.cpp -o test -I /usr/include/opencv4/ $(OPENCV_LIBS) -g -Wall
+
+findContoursTest:findContoursTest.cpp Makefile
+	g++ findContoursTest.cpp -o findContoursTest -I /usr/include/opencv4/ $(OPENCV_LIBS) -g -Wall
+
+trackBar:trackBar.cpp Makefile
+	g++ trackBar.cpp -o trackBar -I /usr/include/opencv4/ $(OPENCV_LIBS) -g -Wall

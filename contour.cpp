@@ -15,7 +15,11 @@ using namespace std;
 #include <algorithm>
 
 
-#define _COMMENTS "\n"
+#define _COMMENTS "\
+cvtColor(image, img_gray, COLOR_BGR2GRAY); NO PARAM\n			\
+threshold(img_gray, thresh, 150,255, ADAPTIVE_THRESH_GAUSSIAN_C); 3 PARAMS\n\
+findContours(thresh, contours, hierarchy, RETR_TREE, CHAIN_APPROX_NONE 2 PARAMS\n\
+\n"
 
 void helper(){}
 // **********************************************************************
@@ -188,6 +192,8 @@ void analyseContours(vector<vector<Point>> &contours)
       char nameComplet[256+30];
       for(uint k=0;k<1000;k++)
 	{
+	  if (k==1000-1)
+	    _STOP("%s : trop de fichiers de contour de cette taille\n",nameComplet);
 	  sprintf(nameComplet,"%s%d.gnu",name,k);
 	  ft = fopen(nameComplet,"r");
 	  if (ft==NULL)
@@ -208,16 +214,13 @@ void analyseContours(vector<vector<Point>> &contours)
       for(uint j=0;j<s;j++)
 	fprintf(ft,"%d %d\n",contour[j].x,contour[j].y);
       fclose(ft);
-       if (s==1413)
-	s=3;
-       vector<Point> mp = multiplon(contour);
-       if (mp.size()!=0)
+      vector<Point> mp = multiplon(contour);
+      if (mp.size()!=0)
 	{
 	  printf("%s il a %d point double\n",nameComplet,(int)mp.size());
 	}
       // y a t il des points doubles
     }
-  exit(0);
 }     // FIN void analyseContours(vector<vector<Point>> &contours)
 // ****************************************************************************************
 
@@ -245,8 +248,12 @@ int main(int na,char *para[])
   
   int verbose = 0;
   int n = 12;
-  char fileName[256] = "a.jpg";
-  _INITQ;
+  char fileName[256] = "b.jpg";
+  int typeTh = 0; 
+  int p1Th = 127;
+  int p2Th = 255;
+  int createContourFiles = 0;
+ _INITQ;
   for (i=1;i<=na;i++)
     {
       char *st,noml[8192],ok,j;
@@ -266,6 +273,10 @@ int main(int na,char *para[])
 	  // METTRE ICI LES DIFFERNTES VALEURS DE LA LIGNE DE COMMANDE
 	  _QU(verbose,"%d"," (niveau de blabla)");
 	  _QU(n,"%d"," (valeur de n)");
+	  _QU(p1Th,"%d"," premier parametre de threshold");
+	  _QU(p2Th,"%d"," deuxieme parametre de threshold");
+	  _QU(typeTh,"%d"," type de threshold");
+	  _QU(createContourFiles,"%d"," si l'on cree un fichier gnuplot du contour");
 	  _QS(fileName,"%s","fichier a traiter");
 	}
       if (!ok) 
@@ -278,16 +289,25 @@ int main(int na,char *para[])
   if (verbose)
     _IMPRIM_PARAM(stdout);
   printf("%s\n",fileName);
-  Mat image = imread(fileName); 
-  uint rows = image.rows;
-  uint cols = image.cols;
+  String windowName = "My Window"; //Name of the window
+  namedWindow(windowName, WINDOW_AUTOSIZE); // Create a window
+  Mat imageVraie = imread(fileName),image;
+  uint rows = imageVraie.rows;
+  uint cols = imageVraie.cols;
+  if ((rows>960) || (cols>1280))
+    {
+      resize(imageVraie,image, Size(960,1280), INTER_LINEAR);
+      printf("image resized from (%d,%d) to (%d,%d)\n",rows,cols,image.rows,image.cols);
+     }
+  else
+    image = imageVraie;
+  moveWindow(windowName,0,0);
+  rows = image.rows;
+  cols = image.cols;
   uchar *data = image.data;
   dataGlobal = data;
   rowsGlobal = rows;
   colsGlobal = cols;
-
-  String windowName = "My Window"; //Name of the window
-  namedWindow(windowName, WINDOW_AUTOSIZE); // Create a window
   imshow(windowName, image); // Show our image inside the created window.
 
   Mat img_gray;
@@ -298,7 +318,28 @@ int main(int na,char *para[])
 	
   // apply binary thresholding
   Mat thresh;
-  threshold(img_gray, thresh, 150,       255, ADAPTIVE_THRESH_GAUSSIAN_C);
+  if (typeTh==0)
+    threshold(img_gray, thresh, p1Th,p2Th, ADAPTIVE_THRESH_GAUSSIAN_C);
+  else if (typeTh==1)
+    threshold(img_gray, thresh, p1Th,p2Th, ADAPTIVE_THRESH_MEAN_C);
+  else if (typeTh==2)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_BINARY);
+  else if (typeTh==3)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_BINARY_INV);
+  else if (typeTh==4)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_MASK);
+  else if (typeTh==5)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_OTSU);
+   else if (typeTh==6)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_TOZERO);
+  else if (typeTh==7)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_TOZERO_INV);
+  else if (typeTh==8)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_TRIANGLE);
+ else if (typeTh==9)
+    threshold(img_gray, thresh, p1Th,p2Th, THRESH_TRUNC);
+  else
+    _STOP("parametre de threshold %d invalide",typeTh);
   /*
     threshold(Mat, Mat, double, double, int)
     
@@ -309,20 +350,19 @@ int main(int na,char *para[])
  	THRESH_MASK
 	THRESH_OTSU
 	THRESH_TOZERO
-	THRESH_TOZERO_INVT
+	THRESH_TOZERO_INV
 	THRESH_TRIANGLE
 	THRESH_TRUNC
 	    
 	https://docs.opencv.org/4.x/d7/d1b/group__imgproc__misc.html#gae8a4a146d1ca78c626a53577199e9c57
   */
-
-  
-    
+  imshow("b & w",thresh);
   //imwrite("image_thres1.jpg", thresh);
 
   vector<Vec4i> hierarchy;
   findContours(thresh, contoursGlobal, hierarchy, RETR_TREE, CHAIN_APPROX_NONE);
-  analyseContours(contoursGlobal);
+  if (createContourFiles)
+    analyseContours(contoursGlobal);
   vector<vector<Point>> contours(1);
   Mat image_copy = image.clone();
   uint garde=0;
